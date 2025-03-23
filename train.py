@@ -1,37 +1,37 @@
 from ultralytics import YOLO
 from roboflow import Roboflow
 import cv2
+import torch
 
-def run_training():
+def get_dataset():
     # grab dataset from roboflow 
-    from roboflow import Roboflow
     rf = Roboflow(api_key="6Su2fBIyIOulThNAbAma")
     project = rf.workspace("utsma").project("fsae-cones-dataset")
     version = project.version(2)
     dataset = version.download("yolov8")
-                         
-               
+                       
+def train_data():
     model = YOLO("yolov8n.pt")
 
     # train dataset taken from roboflow
     model.train(
-    data="/Users/charliecm/UTSMA/YOLOv8 Object Detection/fsae-cones-dataset-2/data.yaml",
-    epochs=1,
+    data="F:\\utsma_detect\\zedx-cone-detector\\fsae-cones-dataset-2\\data.yaml",
+    epochs=20,
     imgsz=640,
     batch=8,
-    device="mps",
+    device="cuda" if torch.cuda.is_available() else "cpu",
     max_det=100,
     conf=0.25,
     verbose=True
     )
 
-
-def run_results():
-    model = YOLO("/../runs/detect/train/weights/best.pt")
-    metrics = model.val(data="/Users/charliecm/UTSMA/YOLOv8 Object Detection/cone-detection-5/data.yaml")
-    results = metrics.results_dict
-    for key, val in results.items():
-        print(f"{key}: {val}")
+def convert_onnx():
+    model = YOLO("F:\\utsma_detect\\zedx-cone-detector\\runs\detect\\train\weights\\best.pt")
+    # convert to onnx format first
+    model.export(format="onnx", opset=12)
+   
+    # run script on main pc --> after installing tensorrt
+    # trtexec --onnx=best.onnx --saveEngine=best.engine --fp16
 
 def video_test_normal():
     # use the pytorch file with the best training results
@@ -120,9 +120,8 @@ def video_test_sped_up():
     # Speed factor (higher = faster video)
     speed_factor = 3
 
-    # scale_factor = 4  
-    # frame_width = int(frame_width * scale_factor)
-    # frame_height = int(frame_height * scale_factor)
+    frame_width = 640
+    frame_height = 640
 
     fourcc = cv2.VideoWriter_fourcc(*'avc1')  # Best for MOV output
     output_path = "output_video.mov"  # Save as MOV
@@ -137,9 +136,12 @@ def video_test_sped_up():
             print("End of video or read error.")
             break
 
+        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        frame = cv2.resize(frame, (640, 640))
+
         # Skip frames to speed up
         if frame_count % speed_factor == 0:  # Keep only every Nth frame
-            results = model(frame)  # Perform YOLO detection
+            results = model(frame, imgsz=640)  # Perform YOLO detection
             frame = results[0].plot()
 
             out.write(frame)  # Write processed frame
@@ -158,8 +160,9 @@ def video_test_sped_up():
     print(f"Processed {frame_count} frames, Saved {saved_frame_count} frames (Speed factor: {speed_factor})")
     print(f"Output video saved as {output_path}")
 
+
 if __name__ == "__main__":
-    # run_training()
-    # run_results()
-    video_test_normal()
+    # get_dataset()
+    # train_data()
+    convert_onnx()
     # video_test_sped_up()

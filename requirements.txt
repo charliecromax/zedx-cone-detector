@@ -1,2 +1,9 @@
 ultralytics
 roboflow
+opencv-python
+torch
+numpy
+
+# Install pycuda manually: https://wiki.tiker.net/PyCuda/Installation
+# Install TensorRT manually: https://developer.nvidia.com/tensorrt
+# Install pyzed via ZED SDK: https://www.stereolabs.com/docs/installation/

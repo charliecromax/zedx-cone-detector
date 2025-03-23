@@ -1,0 +1,16 @@
+names:
+- blue_cone
+- large_orange_cone
+- orange_cone
+- unknown_cone
+- yellow_cone
+nc: 5
+roboflow:
+  license: CC BY 4.0
+  project: fsae-cones-dataset
+  url: https://universe.roboflow.com/utsma/fsae-cones-dataset/dataset/2
+  version: 2
+  workspace: utsma
+test: ../test/images
+train: ../train/images
+val: ../valid/images
