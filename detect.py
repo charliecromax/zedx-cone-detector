@@ -2,7 +2,7 @@ from trt_detector import TRTDetector
 import pyzed.sl as sl
 import cv2
 
-def zedDetector():
+def detect():
     # initialise Zed 
     zed = sl.Camera()
     init_params = sl.InitParameters(camera_resolution=sl.RESOLUTION.HD720, camera_fps=30)
@@ -13,7 +13,7 @@ def zedDetector():
     image_zed = sl.Mat()
 
     # pass in the Tensor engine that you converted from pt --> onnx --> engine
-    detector = TRTDetector("best.engine")
+    detector = TRTDetector("/home/charliecm/zedx-cone-detector/runs/detect/train/weights/best.engine")
 
     # run detection loop 
     while True:
@@ -32,6 +32,7 @@ def zedDetector():
             for (x1, y1, x2, y2, conf, cls) in boxes:
                 label = f"Class {cls} {conf:.2f}"
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                # put text (class name, confidence) above the bounding box for visual representation
                 cv2.putText(frame, f"{label} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
             cv2.imshow("ZED + YOLOv8 (TensorRT)", frame)
@@ -42,4 +43,4 @@ def zedDetector():
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    zedDetector()
+    detect()

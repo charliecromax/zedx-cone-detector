@@ -26,7 +26,7 @@ def train_data():
     )
 
 def convert_onnx():
-    model = YOLO("F:\\utsma_detect\\zedx-cone-detector\\runs\detect\\train\weights\\best.pt")
+    model = YOLO("/home/charliecm/zedx-cone-detector/runs/detect/train/weights/best.pt")
     # convert to onnx format first
     model.export(format="onnx", opset=12)
    
@@ -162,7 +162,8 @@ def video_test_sped_up():
 
 
 if __name__ == "__main__":
+    pass
     # get_dataset()
     # train_data()
-    convert_onnx()
+    # convert_onnx()
     # video_test_sped_up()

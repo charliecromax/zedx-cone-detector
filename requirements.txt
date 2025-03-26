@@ -3,6 +3,7 @@ roboflow
 opencv-python
 torch
 numpy
+pycuda
 
 # Install pycuda manually: https://wiki.tiker.net/PyCuda/Installation
 # Install TensorRT manually: https://developer.nvidia.com/tensorrt
