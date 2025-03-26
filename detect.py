@@ -13,7 +13,7 @@ def detect():
     image_zed = sl.Mat()
 
     # pass in the Tensor engine that you converted from pt --> onnx --> engine
-    detector = TRTDetector("/home/charliecm/zedx-cone-detector/runs/detect/train/weights/best.engine")
+    detector = TRTDetector("/runs/detect/train/weights/best.engine")
 
     # run detection loop 
     while True:
