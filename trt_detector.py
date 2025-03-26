@@ -15,7 +15,7 @@ class TRTDetector:
         # logger for debug output
         self.TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         
-        # all class labels, model was trained on
+        # all class labels that the model was trained on
         self.class_names = ["blue_cone", "large_orange_cone", "orange_cone", "unknown_cone", "yellow_cone"]
         self.allowed_class_ids = [0, 4] # only looking for blue and yellow
 
@@ -30,21 +30,33 @@ class TRTDetector:
             return runtime.deserialize_cuda_engine(f.read())
 
     def _allocate_buffers(self):
-        # allocate host and device memory buffers for inputs and outputs
+        # initialise input/output buffers and binding pointers
         inputs, outputs, bindings = [], [], []
         stream = cuda.Stream()
 
         for binding in self.engine:
+            # get total number of elements (e.g 3x640x640 for image input)
             size = trt.volume(self.engine.get_binding_shape(binding)) * self.engine.max_batch_size
+
+            # NumPy dtype that corresponds to the binding's TensorRT dtype 
             dtype = trt.nptype(self.engine.get_binding_dtype(binding))
+
+            # pin host mem to speed up transfer to GPU
             host_mem = cuda.pagelocked_empty(size, dtype) # Pinned mem
+
+            # device mem allocated directly on GPU
             device_mem = cuda.mem_alloc(host_mem.nbytes) # GPU mem
+
+            # save GPU mem pointer for TensorRT to use during infernce
+            # add the mem buffers to the input or output list depending on whether its and input or output tensor
             bindings.append(int(device_mem))
             if self.engine.binding_is_input(binding):
                 inputs.append({'host': host_mem, 'device': device_mem})
             else:
                 outputs.append({'host': host_mem, 'device': device_mem})
         
+        # return inputs, outputs, bindings and stream for inference
+        # used to copy data to GPU, run inference and copy results back to CPU
         return inputs, outputs, bindings, stream
 
     def _preprocess(self, frame):
@@ -57,36 +69,62 @@ class TRTDetector:
     def _postprocess(self, detections, frame):
         # convert model outputs to bbox coords filtering by confidence
         boxes = []
+
+        # loop over each detection
         for det in detections:
+            # check whether confidence is greater than the threshold, if not, skip
             if det[4] < self.conf_thresh:
                 continue
+
+            # extract bbox coordinates (center x, center y, width, height)
             x, y, w, h = det[:4] # YOLO format: x, y, width, height
+
+            # probabilities for each class
             class_scores = det[5:]
+
+            # choose class id with the highest confidence score
             class_id = np.argmax(class_scores)
+
+            # save class Id and its confidence score
             confidence = class_scores[class_id]
+
+            # only keep detections that have met the confidence threshold and are either blue or yellow cones (class_names[0, 4]) 
             if confidence > self.conf_thresh and class_id in self.allowed_class_ids:
-                # convert to (x1, y1, x2, y2)
+                # convert to (x1, y1, x2, y2) pixel coordinates
+                # top left (x1, y1), bottom-right (x2, y2) 
                 x1 = int((x - w / 2) * frame.shape[1])
                 y1 = int((y - h / 2) * frame.shape[0])
                 x2 = int((x + w / 2) * frame.shape[1])
                 y2 = int((y + h / 2) * frame.shape[0])
+
+                # convert class ID to label
                 label = self.class_names[class_id] if class_id < len(self.class_names) else str(class_id)
+
+                # append final detection to result list
                 boxes.append((x1, y1, x2, y2, confidence, label))
         return boxes
 
     def detect(self, frame):
         # run full detection sequence: preprocess, inference, postprocess
         img = self._preprocess(frame)
+
+        # flatten image array to 1D, then copy to host memory buffer
         np.copyto(self.inputs[0]['host'], img.ravel())
 
-        # copy input to device
+        # copy input from host CPU memory to device GPU memory
         cuda.memcpy_htod_async(self.inputs[0]['device'], self.inputs[0]['host'], self.stream)
-        # run inference on input
+
+        # execute TensorRt engine asynchronously using input and output memory bindings and CUDA stream
+        # this is where the YOLOv8 model runs inference on the output
         self.context.execute_async_v2(bindings=self.bindings, stream_handle=self.stream.handle)
-        # copy output back to host
+
+        # copy result of inference from GPU back to CPU memory
         cuda.memcpy_dtoh_async(self.outputs[0]['host'], self.outputs[0]['device'], self.stream)
+
+        # block until all preceding CUDA operations have been completed 
         self.stream.synchronize()
 
+        # reshape raw output into YOLO format 
         detections = self.outputs[0]['host'].reshape(-1, 85) # YOLOv8 format: (num_detections, 85)
         return self._postprocess(detections, frame)
 
