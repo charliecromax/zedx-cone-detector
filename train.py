@@ -2,6 +2,7 @@ from ultralytics import YOLO
 from roboflow import Roboflow
 import cv2
 import torch
+import time
 
 def get_dataset():
     # grab dataset from roboflow 
@@ -22,6 +23,7 @@ def train_data():
     device="cuda" if torch.cuda.is_available() else "cpu",
     max_det=100,
     conf=0.25,
+    save=True,
     verbose=True
     )
 
@@ -120,15 +122,13 @@ def video_test_sped_up():
     # Speed factor (higher = faster video)
     speed_factor = 3
 
-    frame_width = 640
-    frame_height = 640
-
     fourcc = cv2.VideoWriter_fourcc(*'avc1')  # Best for MOV output
     output_path = "output_video.mov"  # Save as MOV
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
     frame_count = 0
     saved_frame_count = 0
+    start = time.perf_counter()
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -153,16 +153,19 @@ def video_test_sped_up():
 
         frame_count += 1
 
+    end = time.perf_counter()
+    elapsed = end - start
     cap.release()
     out.release()
     cv2.destroyAllWindows()
 
     print(f"Processed {frame_count} frames, Saved {saved_frame_count} frames (Speed factor: {speed_factor})")
     print(f"Output video saved as {output_path}")
+    print(f"Average runtime per frame: {(elapsed * (10**3))/frame_count:.1f} ms")
 
 
 if __name__ == "__main__":
     # get_dataset()
-    # train_data()
-    convert_onnx()
+    train_data()
+    # convert_onnx()
     # video_test_sped_up()
